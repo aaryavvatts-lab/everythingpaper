@@ -8,7 +8,7 @@ Offline (default, no network): duplicate keys and titles, missing required field
 DOIs, implausible years, "and others" author lists, URL-form DOIs, cited-but-missing and
 uncited keys when --tex is given.
 
---online (sends titles and DOIs from the bib to api.crossref.org and export.arxiv.org; skip
+--online (sends titles and DOIs from the bib to api.crossref.org, api.datacite.org and export.arxiv.org; skip
 it for a confidential manuscript): confirms each DOI resolves, compares the registered title
 with the bib title, flags retractions Crossref records, suggests a DOI for entries without
 one, and checks arXiv ids. A match is evidence the reference EXISTS. It does not prove the
@@ -81,6 +81,12 @@ def parse_bib(text):
                 mm = re.match(r"[^,\n]+", body[k:])
                 val = mm.group(0).strip() if mm else ""
             fields.setdefault(name, re.sub(r"\s+", " ", val).strip())
+        if not fields.get("eprint"):
+            for src in ("journal", "howpublished", "note", "url", "booktitle"):
+                am = re.search(r"arxiv[:.\s/abs]*\s*(\d{4}\.\d{4,5}|[a-z\-]+(?:\.[A-Z]{2})?/\d{7})", fields.get(src, ""), re.I)
+                if am:
+                    fields["eprint"] = am.group(1)
+                    break
         entries.append({"key": m.group(2), "type": etype, "fields": fields, "line": text.count("\n", 0, m.start()) + 1})
     return entries
 
@@ -92,10 +98,17 @@ def norm(s):
     return re.sub(r"\s+", " ", s).strip()
 
 
-def get_json(url):
+def get_json(url, retries=2):
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=15) as r:
-        return json.loads(r.read().decode("utf-8", "replace"))
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return json.loads(r.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as ex:
+            if ex.code in (429, 500, 502, 503, 504) and attempt < retries:
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            raise
 
 
 def get_text(url):
@@ -189,7 +202,18 @@ def main():
                         msg = get_json("https://api.crossref.org/works/" + urllib.parse.quote(doi))["message"]
                     except urllib.error.HTTPError as ex:
                         if ex.code == 404:
-                            add("FAIL", k, "DOI not found at Crossref: %s (may be a DataCite or other registry DOI; check by hand)" % doi)
+                            try:  # datasets, software and many preprints are registered at DataCite
+                                dc = get_json("https://api.datacite.org/dois/" + urllib.parse.quote(doi))["data"]["attributes"]
+                                reg = ((dc.get("titles") or [{}])[0]).get("title", "")
+                                r = difflib.SequenceMatcher(None, norm(title), norm(reg)).ratio()
+                                add("OK" if r >= 0.85 else "WARN", k,
+                                    "DOI found at DataCite, title match %.2f" % r if r >= 0.85
+                                    else "DOI found at DataCite but title differs (match %.2f): bib=%r registered=%r" % (r, title[:60], reg[:60]))
+                            except urllib.error.HTTPError as ex2:
+                                if ex2.code == 404:
+                                    add("FAIL", k, "DOI not found at Crossref or DataCite: %s (check the DOI by hand)" % doi)
+                                else:
+                                    raise
                             continue
                         raise
                     reg = (msg.get("title") or [""])[0]

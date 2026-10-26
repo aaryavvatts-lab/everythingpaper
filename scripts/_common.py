@@ -147,8 +147,10 @@ def tex_units(path):
         sm = SECTION_RE.search(line)
         if sm:
             flush()
-            section = clean_tex_inline(sm.group(2))
-            continue
+            section = clean_tex_inline(sm.group(2)) or section
+            line = line[:sm.start()] + " " + line[sm.end():]
+            if not line.strip():
+                continue
         if re.search(r"\\begin\{(%s)\}" % MATH_ENVS, line):
             in_math += 1
         if in_math:

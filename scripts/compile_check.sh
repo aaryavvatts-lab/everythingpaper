@@ -4,12 +4,12 @@
 # Usage: compile_check.sh paper.tex [--out DIR] [--page-limit N]
 #
 # Picks the first available engine: latexmk, tectonic, pdflatex (+bibtex or biber).
-# Builds in DIR (default ./qc/build) so your source folder stays clean. Reports: engine,
+# Builds in DIR (default $TMPDIR/everythingpaper-qc/<name>, outside your paper folder). Reports: engine,
 # build status, pages, undefined references and citations, overfull boxes, missing files.
 # Exit: 0 clean, 1 problems (failed build, undefined refs, over the page limit), 2 no compiler.
 set -u
 
-tex=""; out="qc/build"; limit=""
+tex=""; out=""; limit=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) out="$2"; shift 2;;
@@ -21,6 +21,8 @@ done
 if [ -z "$tex" ] || [ ! -f "$tex" ]; then echo "usage: compile_check.sh paper.tex [--out DIR] [--page-limit N]"; exit 2; fi
 
 dir="$(cd "$(dirname "$tex")" && pwd)"; base="$(basename "$tex" .tex)"
+# default build folder is outside the paper folder so QC files never land in the delivery folder
+[ -z "$out" ] && out="${TMPDIR:-/tmp}/everythingpaper-qc/$base"
 mkdir -p "$out"; out="$(cd "$out" && pwd)"
 log="$out/$base.build.log"; : > "$log"
 engine=""; status=1
@@ -45,8 +47,9 @@ else
 fi
 
 pdf="$out/$base.pdf"
-allog="$log"; [ -f "$out/$base.log" ] && allog="$log $out/$base.log"
-count() { cat $allog 2>/dev/null | grep -c -E "$1"; }
+# paths may contain spaces: read the logs through a function, never an unquoted variable
+alllogs() { cat "$log"; [ -f "$out/$base.log" ] && cat "$out/$base.log"; true; }
+count() { alllogs 2>/dev/null | grep -c -E "$1" || true; }
 undef_refs=$(count "(LaTeX Warning: (Reference|Citation) .* undefined|There were undefined (references|citations)|undefined control sequence|Undefined control sequence)")
 overfull=$(count "Overfull \\\\hbox")
 missing=$(count "(File .* not found|not found\\.|No file .*\\.(bbl|aux))")

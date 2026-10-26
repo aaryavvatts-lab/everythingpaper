@@ -52,6 +52,32 @@ def build_sentences(path):
     return sents
 
 
+def pack_chunks(sents, size):
+    """Pack sentences into chunks of at most `size`, never splitting a section across more
+    chunks than needed and merging small neighbouring sections. Keeping chunks section-aligned
+    means an edit only changes the chunk that holds it, so earlier review work is kept."""
+    groups = []
+    for s in sents:
+        if groups and groups[-1][0] == s["section"]:
+            groups[-1][1].append(s)
+        else:
+            groups.append((s["section"], [s]))
+    chunks, cur = [], []
+    for _, g in groups:
+        pieces = [g[i:i + size] for i in range(0, len(g), size)]
+        for piece in pieces:
+            if cur and len(cur) + len(piece) > size:
+                chunks.append(cur)
+                cur = []
+            cur = cur + piece
+            if len(cur) >= size:
+                chunks.append(cur)
+                cur = []
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("file")
@@ -81,7 +107,7 @@ def main():
         return 0
 
     os.makedirs(a.out, exist_ok=True)
-    chunks = [sents[i:i + a.chunk] for i in range(0, len(sents), a.chunk)]
+    chunks = pack_chunks(sents, a.chunk)
     state_path = os.path.join(a.out, "chunks.json")
     old = {}
     if os.path.isfile(state_path):
@@ -89,6 +115,12 @@ def main():
             old = json.load(open(state_path))
         except Exception:
             old = {}
+    ipath = os.path.join(a.out, "issues.md")
+    prev_cov = {}
+    if os.path.isfile(ipath):
+        for mm in re.finditer(r"^- (chunk_\d+): (\w+)", open(ipath, encoding="utf-8").read(), re.M):
+            prev_cov[mm.group(1)] = mm.group(2)
+    reviewed_hashes = {h for n, h in old.items() if prev_cov.get(n) == "reviewed"}
     new_state = {}
     changed = []
     # remove stale chunk files
@@ -100,7 +132,7 @@ def main():
         body = "\n".join(s["text"] for s in ch)
         h = hashlib.sha1(body.encode("utf-8")).hexdigest()
         new_state[name] = h
-        if old.get(name) != h:
+        if h not in reviewed_hashes:
             changed.append(name)
         lines = ["# %s (sentences %s-%s of %s)" % (name, ch[0]["id"], ch[-1]["id"], sents[-1]["id"]), ""]
         cur = None
@@ -113,28 +145,21 @@ def main():
     json.dump(new_state, open(state_path, "w"), indent=1)
 
     # issues.md: keep existing body, rewrite Coverage
-    ipath = os.path.join(a.out, "issues.md")
-    prev_cov = {}
     body = ""
     if os.path.isfile(ipath):
         t = open(ipath, encoding="utf-8").read()
         m = re.search(r"^## Coverage\s*$", t, re.M)
         body = t[:m.start()] if m else t
-        for mm in re.finditer(r"^- (chunk_\d+): (\w+)", t, re.M):
-            prev_cov[mm.group(1)] = mm.group(2)
     else:
         body = ISSUES_HEADER.format(name=os.path.basename(a.file))
     cov = ["## Coverage", ""]
     for name in new_state:
-        status = prev_cov.get(name, "pending")
-        if name in changed:
-            status = "pending"
-        cov.append("- %s: %s" % (name, status))
+        cov.append("- %s: %s" % (name, "pending" if name in changed else "reviewed"))
     open(ipath, "w", encoding="utf-8").write(body.rstrip() + "\n\n" + "\n".join(cov) + "\n")
 
     print("%d sentences in %d chunks -> %s" % (len(sents), len(chunks), a.out))
     if old:
-        print("chunks changed since last run (set to pending): %s" % (", ".join(changed) or "none"))
+        print("chunks to (re)read: %s" % (", ".join(changed) or "none; all unchanged chunks keep their reviewed status"))
     else:
         print("first run: every chunk is pending")
     return 0

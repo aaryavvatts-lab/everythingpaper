@@ -39,9 +39,17 @@ It reports which catalog skills and which programs exist (Python, a LaTeX compil
 **Pick the mode** and say it in the Brief: `DRAFT` (new paper from idea or results), `COMPLETE` (finish a partial draft), `EDIT` (improve prose and structure), `PROOF` (find and fix errors only), `REVIEW` (feedback report, no edits), `REVISE` (respond to reviews, with a rebuttal), `FORMAT` (new venue or camera-ready), `SURVEY` (literature review paper), `CHAPTER` (thesis or dissertation chapter).
 
 **Size the job.**
-- **Light:** one section, an abstract, a cover letter, a rebuttal letter, a proofread of up to about 3000 words, or a review report. Load the one drafting or editing skill that fits, `sentence-audit`, and `deslop`. Run Round 1 scripts and a careful self-pass for Round 2 on the changed text, grade yourself in writing, and skip the Phase 3 checkpoint.
+- **Light:** one section, an abstract, a cover letter, a rebuttal letter, a proofread of up to about 3000 words, or a review report. The Light path:
+  - Load the one drafting or editing skill that fits, `sentence-audit`, and `deslop` (and only those).
+  - Artifacts: give the Brief and a short ledger in chat or `ledger.md`; skip `EVIDENCE.md` unless claims change; skip the live venue lookup unless the user asked about formatting.
+  - Round 1: run `paper_lint.py` only. `citation_check.py` needs a `.bib`, `compile_check.sh` needs a `.tex`; skip them when absent. `paper_lint.py` has only a few spelling and agreement checks, so a proofread depends on your own careful read in Round 2, not on the script.
+  - Round 2 still reads every sentence (`line_review.py`), on the text you are changing.
+  - Round 3: grade yourself in writing. Score a dimension `n/a` when the input cannot show it (an abstract alone has no reproducibility or venue fit).
+  - Skip the Phase 3 checkpoint.
 - **Full:** a new paper, a full manuscript edit or revision, anything for submission, anything with a rebuttal deadline. Every phase runs, Round 3 uses a fresh independent grader, and Phase 3 stops once for the user's pick.
-When both seem to fit, stakes decide: anything going to a venue is Full.
+When both seem to fit, stakes decide: anything going to a venue, or any request containing "submit", "camera-ready", "deadline" or "publishable", is Full even if no venue is named. A request about only a short piece of text is Light.
+
+**Never read the `evals/` folder during a run.** It holds test cases and grader answers for this skill's authors; reading it would defeat the checks.
 
 ## Phase 1: Understand (read-only)
 
@@ -59,7 +67,9 @@ Gather evidence; do not interview the user about what you can find out. Open eve
 
 Ask the user a question only when the goal itself is unusable (a bare "write a paper" with no topic), when evidence needed for a claim is missing and cannot be inferred, or at the Full checkpoint. Otherwise decide and go.
 
-Write three artifacts to the output folder, and show the user at most about 25 lines of them in chat:
+**Venue not named.** Pick the most likely venue from the field and the paper's shape, say plainly that it is an assumption, and read its live rules. Check the deadline: if this cycle's deadline has passed, say so, name the next cycle or a venue with an open deadline, and carry on with the draft in a neutral template. Do not download an official style file without the user's yes.
+
+Write three artifacts to the output folder (a Light job needs only the Brief and a short ledger), and show the user at most about 25 lines of them in chat. If a spine skill produces its own folders or files (`brief/`, `plan/`, a draft), keep them under `paper/` and treat this skill's files below as the record that wins:
 
 - **Paper Brief** (14 lines max): mode, paper type, one-sentence contribution, venue and rules (with date checked), audience, inputs, evidence status, constraints, preferences applied, Light or Full, spine (filled in Phase 2), and anything you assumed.
 - **Requirements Ledger** (`ledger.md`, template in `references/checks.md`): every concrete thing the user asked for, one numbered line each (R1, R2 ...), split into **Asked** (their words) and **Implied** (verified citations, within the page limit, follows the venue template, no fabricated evidence, meaning of the claims unchanged unless flagged). Write each so it can be checked ("at most 8 pages", "adds a limitations section", "fixes all errors in section 3"). Phase 8 grades the paper against it line by line.
@@ -142,6 +152,10 @@ For each section: load its skill, write to the outline's word budget, tie every 
 
 For `EDIT`, `PROOF` and `REVISE` modes there is no blank draft: copy the user's file to `paper/v1/` and work on the copy.
 
+**What each mode may change.** `PROOF` fixes form: spelling, grammar, tense, repeated words, broken references, number mismatches, undefined terms. It does not touch claims. If the user's words go further ("find the mistakes and fix them", "make it submittable"), shrinking an unsupported claim to what the evidence shows is in scope: do it, log it in `CHANGES.md`, and never add evidence. Anything else the read finds about claims is logged with status `out-of-scope`, reported, and left for the user.
+
+**Markers must be literal.** Write `[TODO-EVIDENCE: ...]` directly in the text. Do not hide it inside a macro such as `\todo{}`; `paper_lint.py` flags those macros, but the marker is meant to be searchable.
+
 ## Phase 6: Edit ladder
 
 One kind of change per pass, from large to small, because sentence polish on a paragraph that gets cut is wasted:
@@ -165,18 +179,18 @@ python3 -I <this skill>/scripts/citation_check.py refs.bib --tex paper.tex [--on
 bash <this skill>/scripts/compile_check.sh paper.tex
 ```
 
-`paper_lint.py` finds placeholders and `[TODO-EVIDENCE]`, undefined or unused references and labels, citation keys missing from the bib, repeated words, undefined acronyms, overclaim and AI-tell phrases, over-long sentences, and abstract numbers that never appear in the body. `citation_check.py` finds duplicate and incomplete entries, bad DOIs and, with `--online`, checks entries against Crossref (a public API; ask first if the paper is confidential). `compile_check.sh` builds the PDF and counts undefined references, overfull boxes and pages. Fix every FAIL; fix or explain every WARN. The scripts catch mechanics, not truth: they do not know whether a claim is supported. That is Round 2.
+`paper_lint.py` finds placeholders and `[TODO-EVIDENCE]` (also inside todo macros), undefined or unused references and labels, citation keys missing from the bib, repeated words, undefined acronyms, overclaim and AI-tell phrases, over-long sentences, and abstract numbers that never appear in the body. `citation_check.py` finds duplicate and incomplete entries, bad DOIs and, with `--online`, checks entries against Crossref (a public API; ask first if the paper is confidential). `compile_check.sh` builds the PDF in a scratch folder outside the paper folder and counts undefined references, overfull boxes and pages. Fix every FAIL; fix or explain every WARN. The scripts catch mechanics, not truth: they do not know whether a claim is supported. That is Round 2.
 
 ### Round 2: The professor's read (line by line, every line)
 
 Act as a senior Harvard-level professor who has sat on program committees for years, is reading this on a deadline, and is looking for reasons to reject. They are fair, not cruel, and they quote the exact line. Full protocol, sentence test and severity scale are in `references/checks.md`.
 
-1. Split the manuscript into numbered sentences and chunks: `python3 -I <this skill>/scripts/line_review.py paper.tex --out review/`. It writes `review/chunk_NN.md` (every sentence with an ID such as L0123, plus the section it belongs to) and an empty `review/issues.md`.
+1. Split the manuscript into numbered sentences and chunks: `python3 -I <this skill>/scripts/line_review.py paper/v1/paper.tex --out review/`. Run it on the working copy before you change anything, so line IDs and quotes match the original; after fixes, run it again on the copy to re-read only the changed chunks. It writes `review/chunk_NN.md` (every sentence with an ID such as L0123, plus the section it belongs to) and an empty `review/issues.md`. Compare the sentence count with the source once: if a section looks short, a construct was dropped, so fix the source layout and re-run before trusting coverage.
 2. Read **every chunk, every sentence**, in order. For each sentence run the twelve-point test in `references/checks.md` (supported by evidence? number traceable? citation real and on point? term defined before use? logical jump? ambiguous referent? hedge in proportion? contradicts another line? claim stronger than the table? redundant? tense and notation consistent? does the reader need this?).
 3. Log each finding in `issues.md` as one block: ID, severity (`FATAL`, `MAJOR`, `MINOR`, `NIT`), status, location (line IDs), category, the quoted line, why it is a problem, and the fix. Mark the chunk reviewed in the Coverage list. A chunk with no issues is marked reviewed too, because an unread chunk is a hole.
 4. Then do the reviewer's global pass: Is the central claim clear in the first page? What would a skeptic's top three objections be? Which baseline, control or ablation is missing? What is overclaimed? Would the paper survive if the biggest result were a fluke? Log these as issues too.
-5. **Fix in severity order**: FATAL, MAJOR, MINOR, NIT. Edit the paper, set the issue status to `fixed` and say what changed. If a fix needs evidence you do not have, the status is `blocked` with a `[TODO-EVIDENCE]` in the paper and a line in the report; if it changes meaning, record it in `CHANGES.md`.
-6. Re-run Round 1 and re-read the changed lines (run `line_review.py` again and review only the changed chunks). Check progress with `python3 -I <this skill>/scripts/issue_register.py review/issues.md --gate`: it fails while any FATAL or MAJOR is open and while any chunk is unreviewed.
+5. **Fix in severity order**: FATAL, MAJOR, MINOR, NIT. Edit the paper, set the issue status to `fixed` and say what changed. If a fix needs evidence you do not have, the status is `blocked` with a `[TODO-EVIDENCE]` in the paper and a line in the report. If the problem is real but outside what the user asked for (see "What each mode may change"), the status is `out-of-scope` with a `Reason:` line. If a fix changes meaning, record it in `CHANGES.md`.
+6. Re-run Round 1 and re-read the changed lines (run `line_review.py` again and review only the changed chunks). Check progress with `python3 -I <this skill>/scripts/issue_register.py review/issues.md --gate`: it fails while any FATAL or MAJOR is open and while any chunk is unreviewed. A `GATE: PASS` means the read is complete and nothing fixable is left open. It does not mean the paper is ready: blocked FATAL or MAJOR issues are printed beside it and every one goes in the report as needing the user.
 
 ### Round 3: Independent reviewers (a second mind)
 
@@ -185,7 +199,9 @@ Score each dimension 1 to 5: significance and contribution, soundness of claims 
 - **Full job:** hand a fresh subagent the Brief, Ledger, Evidence Map, the paper, QC reports and the rubric in `references/checks.md`, and tell it to find rejection reasons before scoring. It has not seen your reasoning, so it catches what you stopped seeing. For a venue-matched panel use one of: `paperjury` (CS conferences), `self-review` (NeurIPS-style form), `academic-paper-reviewer` (journals), `review-paper` (economics and social science), plus `paper-review` for an independent meta-review. Two reviewer skills are better than one; they disagree usefully.
 - **Light job:** grade yourself in writing as that skeptical reader: the eight scores on one line and one sentence naming the weakest passage and its fix.
 
-Fix everything under 4, re-run Rounds 1 and 2 on what changed, re-score once. Stop after three full fix passes and say plainly what is still weak. Do not claim acceptance odds; say what a reviewer would likely attack.
+Fix everything under 4, re-run Rounds 1 and 2 on what changed, re-score once. A score that can only rise with evidence you do not have (a skeleton with no results, a claim that needs an experiment) is not chased: record it as blocked, say so, and do not pad the paper to raise it. Stop after three full fix passes and say plainly what is still weak. Do not claim acceptance odds; say what a reviewer would likely attack.
+
+If you are a subagent and cannot start another agent, run the grader pass yourself in a clearly separate role, after re-reading the paper cold, and say in the report that this is weaker than an independent grader.
 
 ## Phase 8: Did I do what was asked? (the closing gate)
 
@@ -211,7 +227,7 @@ Delete caches and temporary builds this run created. Tell the user what to do ne
 
 ## Phase 10: Report
 
-Finish in plain words, under about 18 lines (open evidence gaps and things that need the user are never cut for length): what you made or fixed and where; the mode, spine and skills used; Round 2 counts ("62 issues found: 2 FATAL, 9 MAJOR, all fixed; 4 blocked on missing data"); Round 3 scores and the strongest remaining objection; the ledger result ("all 11 requirements pass"); claims you softened and why; assumptions and defaults; offers you did not apply; and what needs the user (missing results, a policy to confirm, co-author sign-off, a `[TODO-EVIDENCE]`).
+Finish in plain words, under about 18 lines for a Light or small job and about 30 for a full paper (open evidence gaps and things that need the user are never cut for length): what you made or fixed and where; the mode, spine and skills used; Round 2 counts ("62 issues found: 2 FATAL, 9 MAJOR, all fixed; 4 blocked on missing data"); Round 3 scores and the strongest remaining objection; the ledger result ("all 11 requirements pass"); claims you softened and why; assumptions and defaults; offers you did not apply; and what needs the user (missing results, a policy to confirm, co-author sign-off, a `[TODO-EVIDENCE]`).
 
 ## Reference files (read when needed)
 

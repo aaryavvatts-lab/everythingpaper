@@ -71,6 +71,7 @@ What a skeptical expert expects to see before believing the central claim.
 - Verify every entry exists (DOI, arXiv id, publisher page) and read the passage that supports the claim. Use the published version over the preprint when both exist.
 - Cite the original source for a result, not a review that mentions it, unless the review is the point.
 - Self-citation: when it is the closest prior work, cite it; do not pad.
+- Cite arXiv preprints with `@misc{key, author={...}, title={...}, year={...}, eprint={2106.09685}, archivePrefix={arXiv}, primaryClass={cs.LG}}` so they can be verified; prefer the published version when one exists.
 - No "et al." in bib entries where a venue demands full author lists; consistent style; no duplicate keys; capitalisation protected with braces for proper nouns and acronyms in titles.
 - Quote sparingly, with the page. Paraphrase and cite; never copy sentences.
 

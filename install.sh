@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
 done
 
 dest="$target/everythingpaper"
-items="SKILL.md catalog.md README.md LICENSE references scripts evals"
+items="SKILL.md catalog.md README.md LICENSE references scripts"
 
 if [ -e "$dest" ] && ! grep -q '^name: everythingpaper' "$dest/SKILL.md" 2>/dev/null; then
   echo "refusing to overwrite $dest: it exists and is not an everythingpaper install. Move it first."

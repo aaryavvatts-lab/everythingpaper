@@ -118,7 +118,7 @@ Problem: No significance test is reported and one baseline (Table 2, row 3) is h
 Fix: Replace with "outperforms the baselines on datasets A and C (Table 2)" and report seeds and a test, or run the test.
 ```
 
-Header fields: ID, severity, status, line IDs (or section name for global issues), category. Statuses: `open`, `fixed`, `blocked`, `wontfix` (with a reason line). Categories: `claim-support`, `number`, `citation`, `definition`, `logic`, `referent`, `hedge`, `consistency`, `scope`, `fairness`, `redundancy`, `form`, `format`, `missing-evidence`.
+Header fields: ID, severity, status, line IDs (or section name for global issues), category. Statuses: `open`, `fixed`, `blocked` (needs evidence only the user has), `out-of-scope` (real, but the user's request does not cover it; needs a `Reason:` line), `wontfix` (needs a `Reason:` line). Categories: `claim-support`, `number`, `citation`, `definition`, `logic`, `referent`, `hedge`, `consistency`, `scope`, `fairness`, `redundancy`, `form`, `format`, `missing-evidence`.
 
 **Severity**
 - `FATAL`: invalidates a central claim or makes the paper unpublishable as written (fabricated or untraceable number, claim contradicted by data, leakage, a proof gap that breaks the main theorem, a fake citation, plagiarism).
@@ -126,7 +126,7 @@ Header fields: ID, severity, status, line IDs (or section name for global issues
 - `MINOR`: weakens the paper but would not by itself decide (ambiguous referent, wrong tense, loose hedge, redundant paragraph).
 - `NIT`: typo, spacing, style.
 
-`issue_register.py --gate` fails while any FATAL or MAJOR is `open` and while any chunk is not `reviewed`.
+`issue_register.py --gate` fails while any FATAL or MAJOR is `open` and while any chunk is not `reviewed`. It passes with blocked FATAL or MAJOR issues but prints them: a pass means "the read is finished", not "ready to submit".
 
 ## Coverage list
 

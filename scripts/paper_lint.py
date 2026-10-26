@@ -37,6 +37,16 @@ STAT_NEAR = re.compile(r"(p\s*[<=>]|\bp-?value|confidence interval|\bCI\b|t-test
 ACR_OK = {"AI", "ML", "US", "UK", "EU", "PDF", "URL", "HTML", "GPU", "CPU", "API", "IEEE", "ACM", "OK", "ID", "IID",
           "MATH", "II", "III", "IV", "TODO", "RGB", "LSTM", "CNN", "SGD", "KL", "MSE", "MAE", "LLM", "NLP", "SOTA",
           "AUC", "ROC", "FAQ", "AM", "PM", "NASA", "DNA", "RNA", "MRI", "CT", "BERT", "GPT"}
+COMMON_ERRORS = [
+    (r"\b(beleive[sd]?|recieve[sd]?|seperate(ly)?|occured|definately|accomodate|untill|wich|teh|adn|thier|goverment|"
+     r"enviroment|neccessary|sucessful(ly)?|occurence|refered|existance|independant|prefered|begining|comparision|"
+     r"dependance|alot|algorith|apparantly|arguement|consistant|dissapear|embarass|noticable|publically|reccomend|"
+     r"succesful|tommorow|wierd)\b", "misspelling"),
+    (r"\b(more|less|better|worse|faster|slower|higher|lower|larger|smaller|greater|fewer|\w+er)\s+then\b", "then-than"),
+    (r"\b(experiments|results|methods|datasets|baselines|models|algorithms|samples)\s+is\b", "agreement"),
+    (r"\b(method|model|approach|dataset|baseline|algorithm|result)\s+are\b", "agreement"),
+    (r"\b(it's|don't|can't|won't|doesn't|isn't|aren't|didn't|we've|we'll)\b", "contraction"),
+]
 SPELL = [("color", "colour"), ("analyze", "analyse"), ("behavior", "behaviour"), ("modeling", "modelling"),
          ("optimize", "optimise"), ("generalize", "generalise"), ("center", "centre"), ("labeled", "labelled"),
          ("organization", "organisation"), ("normalize", "normalise")]
@@ -69,6 +79,25 @@ def main():
         for pat, code in ph:
             for m in re.finditer(pat, line, re.I if code != "todo" else 0):
                 add("FAIL", code, ln, "unresolved: %s" % m.group(0)[:70])
+
+    # placeholders hidden inside LaTeX comments are not in the PDF but are still unfinished work
+    if tex:
+        for i, line in enumerate(raw.split("\n"), 1):
+            m = re.search(r"(?<!\\)%(.*)$", line)
+            if m and re.search(r"TODO|FIXME|TBD|XXX", m.group(1)):
+                add("WARN", "commented-placeholder", i, "unfinished note inside a comment: %s" % m.group(1).strip()[:60])
+
+    # macros that hide an unfinished marker (for example \\newcommand{\\todo}{[TODO-EVIDENCE ...]})
+    hidden = set()
+    for m in re.finditer(r"\\(?:newcommand|renewcommand|def|providecommand)\*?\s*\{?\\([A-Za-z]+)\}?(?:\[\d\])?\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", raw):
+        if re.search(r"TODO|FIXME|TBD|XXX|EVIDENCE", m.group(2)):
+            hidden.add(m.group(1))
+    hidden |= {"todo", "TODO", "fixme", "FIXME", "needcite", "NEEDCITE", "citeneeded"}
+    if tex:
+        for ln, line in body_lines:
+            for name in hidden:
+                if re.search(r"\\" + re.escape(name) + r"\b", line) and "newcommand" not in line and "\\def" not in line:
+                    add("FAIL", "todo-macro", ln, "unfinished-work macro \\%s still used" % name)
 
     # --- labels, refs, cites ---------------------------------------------------------------
     labels = collections.defaultdict(list)
@@ -148,6 +177,12 @@ def main():
                 add("WARN", "significant-no-test", src, "'significant' without a test or interval nearby: %s..." % s[:70])
                 break
 
+    for src, sec, s in sentences:
+        for pat, kind in COMMON_ERRORS:
+            m = re.search(pat, s, re.I)
+            if m:
+                add("WARN", "common-error", src, "possible %s '%s': %s..." % (kind, m.group(0), s[:70]))
+
     # acronyms
     def_ac = set(re.findall(r"\(\s*([A-Z][A-Za-z]{1,7}s?)\s*\)", full_text))
     def_ac |= set(re.findall(r"\\newacronym\{[^}]*\}\{([^}]*)\}", raw))
@@ -169,7 +204,7 @@ def main():
                 continue
             if not re.search(r"(?<![\d.])" + re.escape(core) + r"(?![\d])", body_text):
                 add("WARN", "abstract-number", 0, "number %s in the abstract never appears in the body" % num)
-    elif not abs_text:
+    elif not abs_text and len({sec for _, sec, _ in units if not sec.startswith(("(", "Title"))}) >= 2:
         add("WARN", "no-abstract", 0, "no abstract found (\\begin{abstract} or a heading named Abstract)")
 
     # spelling variants

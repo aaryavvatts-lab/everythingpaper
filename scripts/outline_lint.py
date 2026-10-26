@@ -158,6 +158,10 @@ def main():
             lvl = "WARN" if a.allow_missing else "FAIL"
             add(lvl, "claim %s evidence is %r; resolve before drafting" % (c, "; ".join(evs)[:50]))
 
+    for c, evs in evidenced.items():
+        if any(re.search(r"\b(planned|pending|will|expected|to be (run|added)|not yet)\b", e, re.I) for e in evs):
+            add("WARN", "claim %s evidence is planned, not in hand; keep it a hypothesis and mark it [TODO-EVIDENCE] in the draft" % c)
+
     pl = re.search(r"\d+(?:\.\d+)?", head.get("page_limit", ""))
     if pl:
         wpp = re.search(r"\d+", head.get("words_per_page", "600"))

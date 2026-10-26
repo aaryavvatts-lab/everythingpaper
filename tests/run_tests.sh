@@ -88,6 +88,48 @@ if [ $rc -eq 2 ]; then ok "compile_check reports no compiler (rc 2)"; else
   bash "$S/compile_check.sh" "$F/paper_defects.tex" --out "$tmp/build2" >/dev/null; [ $? -eq 1 ] && ok "compile_check fails undefined refs" || bad "compile_check defects exit"
 fi
 
+# regressions found by end-to-end runs of the skill
+out=$(py "$S/paper_lint.py" "$F/paper_macro.tex"); rc=$?
+[ $rc -eq 1 ] && ok "paper_lint fails a marker hidden in a \\todo macro" || bad "todo macro exit ($rc)"
+has "paper_lint names the macro" "$out" "todo-macro"
+py "$S/line_review.py" "$F/paper_macro.tex" --out "$tmp/rmac" >/dev/null
+has "line_review keeps text on the same line as a heading command" "$(cat "$tmp/rmac"/chunk_*.md)" "must be kept"
+printf 'We introduce FastNet. Our method are faster then prior work, and we beleive it works. Experiments is run on three datasets.\n' > "$tmp/abs.md"
+out=$(py "$S/paper_lint.py" "$tmp/abs.md")
+for k in misspelling then-than agreement; do has "paper_lint common-error: $k" "$out" "$k"; done
+hasno "paper_lint does not demand an abstract in an abstract-only file" "$out" "no-abstract"
+cat > "$tmp/ax.bib" <<'EOF'
+@article{lora, author={Hu, Edward}, title={LoRA}, journal={arXiv preprint arXiv:2106.09685}, year={2021}}
+EOF
+out=$(py "$S/citation_check.py" "$tmp/ax.bib")
+hasno "citation_check accepts arXiv ids in the journal field" "$out" "hard to verify"
+python3 -I - "$tmp/review/issues.md" <<'PY'
+import sys
+p=sys.argv[1]; t=open(p).read()
+t=t.replace("| open | L0003 | claim-support","| out-of-scope | L0003 | claim-support").replace("Fix: z","Reason: a proofread does not change claims")
+open(p,"w").write(t)
+PY
+sed -i.bak 's/: pending/: reviewed/' "$tmp/review/issues.md"
+out=$(py "$S/issue_register.py" "$tmp/review/issues.md" --gate); rc=$?
+[ $rc -eq 0 ] && ok "gate accepts an out-of-scope issue with a Reason" || bad "out-of-scope gate exit ($rc)"
+# review carry-forward: unchanged chunks keep their reviewed status after an edit
+mkdir -p "$tmp/cf"; cp "$F/paper_defects.tex" "$tmp/cf/p.tex"
+py "$S/line_review.py" "$tmp/cf/p.tex" --out "$tmp/cf/r" --chunk 4 >/dev/null
+sed -i.bak 's/: pending/: reviewed/' "$tmp/cf/r/issues.md"
+sed -i.bak 's/the the/the/' "$tmp/cf/p.tex"
+out=$(py "$S/line_review.py" "$tmp/cf/p.tex" --out "$tmp/cf/r" --chunk 4)
+has "edit sends the changed chunk back to pending" "$out" "chunk_02"
+hasno "edit does not reopen an untouched chunk" "$out" "chunk_01"
+py "$S/line_review.py" "$tmp/cf/p.tex" --out "$tmp/cf/r" --chunk 4 >/dev/null
+has "untouched chunk stays reviewed on a second re-run" "$(cat "$tmp/cf/r/issues.md")" "chunk_01: reviewed"
+
+# compile_check must work when the output path contains spaces
+if [ -n "$(command -v tectonic latexmk pdflatex 2>/dev/null)" ]; then
+  out=$(bash "$S/compile_check.sh" "$F/paper_defects.tex" --out "$tmp/with space/build" 2>&1); rc=$?
+  [ $rc -eq 1 ] && ok "compile_check fails the defect paper with spaces in the path" || bad "compile_check spaced path exit ($rc)"
+  hasno "compile_check does not report 0 undefined refs for the defect paper" "$out" "commands: 0$"
+fi
+
 # check_skills
 bash "$S/check_skills.sh" --tools >/dev/null && ok "check_skills runs" || bad "check_skills failed"
 

@@ -9,8 +9,10 @@ Usage:
 
 Gate fails while: any FATAL or MAJOR issue is `open`; any chunk in the Coverage list is
 not `reviewed`; chunk files exist next to issues.md that Coverage does not list; a
-`wontfix` issue has no `Reason:` line. Blocked FATAL/MAJOR issues are reported loudly
-(they need the user) and fail only with --strict.
+`wontfix` or `out-of-scope` issue has no `Reason:` line. Blocked FATAL/MAJOR issues are
+reported loudly (they need the user) and fail only with --strict. `out-of-scope` is for a
+real problem the user's request does not cover (for example a claim problem found during a
+proofread): it is reported, not fixed, and does not fail the gate.
 """
 import argparse
 import glob
@@ -19,10 +21,10 @@ import os
 import re
 import sys
 
-HEAD = re.compile(r"^###\s+(I-\d+)\s*\|\s*(FATAL|MAJOR|MINOR|NIT)\s*\|\s*(open|fixed|blocked|wontfix)\s*\|\s*([^|]*?)\s*\|\s*(.+?)\s*$",
+HEAD = re.compile(r"^###\s+(I-\d+)\s*\|\s*(FATAL|MAJOR|MINOR|NIT)\s*\|\s*(open|fixed|blocked|wontfix|out-of-scope)\s*\|\s*([^|]*?)\s*\|\s*(.+?)\s*$",
                   re.I | re.M)
 SEV = ["FATAL", "MAJOR", "MINOR", "NIT"]
-STA = ["open", "fixed", "blocked", "wontfix"]
+STA = ["open", "fixed", "blocked", "wontfix", "out-of-scope"]
 
 
 def parse(text):
@@ -68,15 +70,15 @@ def main():
     dup = sorted({x for x in ids if ids.count(x) > 1})
     if dup:
         problems.append("duplicate issue IDs: " + ", ".join(dup))
-    print("%-8s" % "" + "".join("%9s" % s for s in STA) + "%9s" % "total")
+    print("%-8s" % "" + "".join("%13s" % s for s in STA) + "%9s" % "total")
     for s in SEV:
         row = [sum(1 for i in issues if i["severity"] == s and i["status"] == st) for st in STA]
-        print("%-8s" % s + "".join("%9d" % r for r in row) + "%9d" % sum(row))
+        print("%-8s" % s + "".join("%13d" % r for r in row) + "%9d" % sum(row))
     print()
 
     for i in issues:
-        if i["status"] == "wontfix" and not i["has_reason"]:
-            problems.append("%s is wontfix without a Reason: line" % i["id"])
+        if i["status"] in ("wontfix", "out-of-scope") and not i["has_reason"]:
+            problems.append("%s is %s without a Reason: line" % (i["id"], i["status"]))
         if not i["has_quote"]:
             warns.append("%s has no Quote: line" % i["id"])
         if i["status"] in ("fixed",) and not i["has_fix"]:
@@ -113,7 +115,10 @@ def main():
         if problems:
             print("GATE: FAIL")
             return 1
-        print("GATE: PASS")
+        if blocked_bad:
+            print("GATE: PASS (review complete), but %d FATAL/MAJOR issues are blocked on the user: NOT ready to submit" % len(blocked_bad))
+        else:
+            print("GATE: PASS")
     return 0
 
 

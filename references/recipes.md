@@ -56,7 +56,7 @@ Trap: changing meaning while "polishing". Anything that changes a claim, number 
 3. `line_review.py` and the twelve-point test, but fix only `form`, `number`, `definition` and `referent` issues. Report anything about claims, evidence or logic as a finding, do not rewrite it.
 4. Skills: `sentence-audit`, `latex-polish` (light), `reference-checker`.
 
-Trap: scope creep. A proofread does not change the argument.
+Trap: scope creep. A proofread does not change the argument. Claim problems found while reading are logged `out-of-scope` and reported. If the user's request is broader ("find the mistakes and fix them"), shrinking an unsupported claim is in scope, logged in `CHANGES.md`, and never replaced with new evidence.
 
 ## Review only (a report on a paper)
 

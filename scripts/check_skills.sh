@@ -38,6 +38,9 @@ if [ $tools -eq 1 ]; then
   for t in python3 tectonic latexmk pdflatex xelatex bibtex biber pandoc pdfinfo pdftotext git gh node curl; do
     if p=$(command -v "$t" 2>/dev/null); then echo "ok       $t ($p)"; else echo "absent   $t"; fi
   done
+  if command -v tectonic >/dev/null 2>&1; then
+    echo "note: tectonic builds the bibliography itself, so absent bibtex/biber are not a problem."
+  fi
   if ! command -v tectonic >/dev/null 2>&1 && ! command -v latexmk >/dev/null 2>&1 && ! command -v pdflatex >/dev/null 2>&1; then
     echo "note: no LaTeX engine found; compile_check.sh cannot verify builds. Say so in the report; do not claim a clean build."
   fi
