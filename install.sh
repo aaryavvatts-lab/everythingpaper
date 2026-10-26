@@ -38,6 +38,8 @@ for i in $items; do [ -e "$src/$i" ] && echo "  copy $i"; done
 if [ $dry -eq 1 ]; then echo "dry run: nothing changed"; exit 0; fi
 
 mkdir -p "$dest"
+# older versions shipped evals/ and tests/; they are not part of the installed skill and a run must not read them
+for old in evals tests; do [ -d "$dest/$old" ] && rm -rf "$dest/$old"; done
 for i in $items; do
   [ -e "$src/$i" ] || continue
   rm -rf "$dest/$i"   # only paths this installer owns inside the everythingpaper folder
