@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # compile_check.sh - build a LaTeX paper in a scratch folder and report what a reviewer would see.
 #
-# Usage: compile_check.sh paper.tex [--out DIR] [--page-limit N]
+# Usage: compile_check.sh paper.tex [--out DIR] [--page-limit N] [--copy-to DIR]
 #
 # Picks the first available engine: latexmk, tectonic, pdflatex (+bibtex or biber).
 # Builds in DIR (default $TMPDIR/everythingpaper-qc/<name>, outside your paper folder). Reports: engine,
@@ -9,11 +9,12 @@
 # Exit: 0 clean, 1 problems (failed build, undefined refs, over the page limit), 2 no compiler.
 set -u
 
-tex=""; out=""; limit=""
+tex=""; out=""; limit=""; copyto=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) out="$2"; shift 2;;
     --page-limit) limit="$2"; shift 2;;
+    --copy-to) copyto="$2"; shift 2;;
     -h|--help) sed -n '2,10p' "$0"; exit 0;;
     *) tex="$1"; shift;;
   esac
@@ -72,6 +73,7 @@ PY
 ); fi
 fi
 
+if [ -n "$copyto" ] && [ -f "$pdf" ]; then mkdir -p "$copyto" && cp "$pdf" "$copyto/" && echo "pdf copied to: $copyto/$base.pdf"; fi
 echo "engine: $engine"
 if [ -f "$pdf" ] && [ "$status" -eq 0 ]; then echo "build: OK ($pdf)"; else echo "build: FAILED (see $log)"; fi
 echo "pages: $pages${limit:+ (limit $limit, counts everything including references)}"

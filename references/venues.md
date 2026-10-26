@@ -12,6 +12,10 @@ Contents: How to find the rules · What to record · What to check by venue fami
 4. Use the venue skill (`neural-information-processing-systems`, `international-conference-on-machine-learning`, `annual-meeting-of-the-association-for-computational-linguistics`, ...) for fit, framing and common desk-reject risks. They are strategy aids and say to check the live call. Do that.
 5. If a page cannot be reached, mark the rule `unverified` in the Brief and report. Do not guess.
 
+## Workshops, tracks and unnamed venues
+
+A workshop paper follows the workshop's own call, which is usually a short page limit (4 to 8 pages), often non-archival, with the parent conference's template and anonymity rules. If the user says "a workshop" and names nothing, do not guess a venue to look up. Read the live rules of the parent conference's workshop guidelines if the user names the conference; otherwise write to a neutral template, mark every venue rule `unverified` in the Brief, and ask in the report for the workshop name, page limit, template, anonymity and AI-use policy. The same applies to an unnamed journal: use the field's norms from `craft.md` and say the format is unverified.
+
 ## What to record (in `SOURCES.md` under "Venue")
 
 | Item | Value | Source URL | Date read |

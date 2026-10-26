@@ -130,6 +130,18 @@ if [ -n "$(command -v tectonic latexmk pdflatex 2>/dev/null)" ]; then
   hasno "compile_check does not report 0 undefined refs for the defect paper" "$out" "commands: 0$"
 fi
 
+# regressions from the realistic-paper run
+out=$(py "$S/paper_lint.py" "$F/paper_realistic.tex" --bib "$F/refs_realistic.bib")
+has "paper_lint catches 3 seeds vs 5 seeds" "$out" "count-mismatch"
+py "$S/line_review.py" "$F/paper_realistic.tex" --out "$tmp/real" --chunk 12 >/dev/null
+chunks="$(cat "$tmp/real"/chunk_*.md)"
+has "line_review shows table rows with their numbers" "$chunks" "Table row: No warmup | 3.41"
+has "line_review keeps inline math so symbols can be checked" "$chunks" '\\eta_t'
+if [ -n "$(command -v tectonic latexmk pdflatex 2>/dev/null)" ]; then
+  bash "$S/compile_check.sh" "$F/paper_clean.tex" --out "$tmp/b3" --copy-to "$tmp/pdfout" >/dev/null
+  [ -f "$tmp/pdfout/paper_clean.pdf" ] && ok "compile_check --copy-to delivers the pdf" || bad "compile_check --copy-to"
+fi
+
 # check_skills
 bash "$S/check_skills.sh" --tools >/dev/null && ok "check_skills runs" || bad "check_skills failed"
 

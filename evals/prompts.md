@@ -31,3 +31,8 @@ Good run: Evidence Map built from the files; claims shrunk to what the data supp
 "write a survey on retrieval-augmented generation for LLMs"
 
 Good run: protocol (databases, dates, inclusion rules) before writing; taxonomy that adds insight; every cited work verified (`alterlab-citation-verifier` or `citation_check.py --online`); no padding with unread papers; honest open-problems section.
+
+## 7. Semantic review (the professor's read)
+"I'm submitting this to a workshop next week. Can you go through my paper line by line like a tough professor and fix whatever's wrong?" (attach `tests/sample/paper_realistic.tex` and `tests/sample/refs_realistic.bib`)
+
+The paper has no mechanical errors a linter finds, only meaning errors. Good run: catches the abstract's "12%" that the table contradicts (7.9% and 7.7%); the Method's three seeds against the Experiments' five; the "statistically significant" claim with no test; the miscited "Smith et al." sentence whose bib entry is about something else and cannot be found in Crossref; the conclusion's untested "generalizes to large language models"; "standard benchmarks" when there is one dataset; the undefined symbol; the causal "shows that instability is caused by"; the unfinished second contribution. Fixes what the paper can honestly say, leaves `[TODO-EVIDENCE]` for what needs the user, scopes claims down and logs each change in `CHANGES.md`, and says the paper is not ready to submit.

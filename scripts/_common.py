@@ -59,12 +59,37 @@ def tex_body_lines(text):
 MATH_ENVS = r"equation\*?|align\*?|gather\*?|multline\*?|eqnarray\*?|displaymath|math|split|array"
 
 
+def tabular_to_text(raw):
+    """Turn tabular environments into one readable 'Table row: a | b | c.' line per row."""
+    def repl(m):
+        body = m.group(2)
+        body = re.sub(r"\\(toprule|midrule|bottomrule|hline|cline\{[^}]*\}|cmidrule(\([^)]*\))?\{[^}]*\})", "", body)
+        rows = [r.strip() for r in re.split(r"\\\\(?:\[[^\]]*\])?", body) if r.strip()]
+        out = []
+        for r in rows:
+            cells = [clean_tex_inline(c) for c in re.split(r"(?<!\\)&", r)]
+            out.append("Table row: " + " | ".join(cells) + ".")
+        return "\n\n".join(out) + "\n\n"
+    return re.sub(r"\\begin\{(tabular\*?|tabularx|longtable)\}(?:\[[^\]]*\])?(?:\{[^{}]*\})*(.*?)\\end\{\1\}", repl, raw, flags=re.S)
+
+
 def clean_tex_inline(s):
-    """Make a LaTeX fragment readable: citations, refs, math, formatting commands."""
-    s = re.sub(r"\\begin\{(%s)\}.*?\\end\{\1\}" % MATH_ENVS, " MATH ", s, flags=re.S)
-    s = re.sub(r"\$\$.*?\$\$", " MATH ", s, flags=re.S)
-    s = re.sub(r"\\\[.*?\\\]", " MATH ", s, flags=re.S)
-    s = re.sub(r"\$[^$\n]+\$", "MATH", s)
+    """Make a LaTeX fragment readable: citations, refs, formatting commands. Math is kept
+    (inline as written, display equations as [EQ: ...]) so symbols can be reviewed."""
+    stash = []
+
+    def keep(text):
+        stash.append(text)
+        return "\x00%d\x00" % (len(stash) - 1)
+
+    def display(m):
+        inner = re.sub(r"\\label\{[^}]*\}", "", m.group(m.lastindex or 0))
+        return keep(" [EQ: " + re.sub(r"\s+", " ", inner).strip() + "] ")
+
+    s = re.sub(r"\\begin\{(%s)\}(.*?)\\end\{\1\}" % MATH_ENVS, lambda m: display_env(m, keep), s, flags=re.S)
+    s = re.sub(r"\$\$(.*?)\$\$", lambda m: keep(" [EQ: " + re.sub(r"\s+", " ", m.group(1)).strip() + "] "), s, flags=re.S)
+    s = re.sub(r"\\\[(.*?)\\\]", lambda m: keep(" [EQ: " + re.sub(r"\s+", " ", m.group(1)).strip() + "] "), s, flags=re.S)
+    s = re.sub(r"\$([^$\n]+)\$", lambda m: keep("$" + m.group(1).strip() + "$"), s)
     s = re.sub(r"\\(?:cite[a-zA-Z]*|parencite|textcite|autocite)\*?(?:\[[^\]]*\])*\{([^}]*)\}", r"[cite:\1]", s)
     s = re.sub(r"\\(?:ref|eqref|autoref|cref|Cref|pageref)\*?\{([^}]*)\}", r"(ref:\1)", s)
     s = re.sub(r"\\(?:bibliography|bibliographystyle|addbibresource|maketitle|tableofcontents|printbibliography)\b(\[[^\]]*\])?(\{[^}]*\})?", " ", s)
@@ -79,8 +104,14 @@ def clean_tex_inline(s):
     s = s.replace("\\&", "&").replace("\\%", "%").replace("\\_", "_").replace("\\#", "#")
     s = re.sub(r"\\[a-zA-Z]+\*?", " ", s)
     s = s.replace("{", "").replace("}", "")
+    s = re.sub(r"\x00(\d+)\x00", lambda m: stash[int(m.group(1))], s)
     s = re.sub(r"[ \t]+", " ", s)
     return s.strip()
+
+
+def display_env(m, keep):
+    inner = re.sub(r"\\label\{[^}]*\}", "", m.group(2))
+    return keep(" [EQ: " + re.sub(r"\s+", " ", inner).strip() + "] ")
 
 
 SECTION_RE = re.compile(r"\\(part|chapter|section|subsection|subsubsection|paragraph)\*?\{([^}]*)\}")
@@ -102,7 +133,7 @@ def tex_units(path):
     def flush():
         nonlocal buf, buf_line
         if buf:
-            raw = "\n".join(buf)
+            raw = tabular_to_text("\n".join(buf))
             # pull captions out as separate units
             while True:
                 m = CAPTION_RE.search(raw)

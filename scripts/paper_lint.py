@@ -153,6 +153,7 @@ def main():
         for s in C.split_sentences(text):
             sentences.append((src, sec, s))
     full_text = " ".join(t for _, _, t in units)
+    full_text_nomath = re.sub(r"\$[^$]*\$|\[EQ:[^\]]*\]", " ", full_text)
 
     for src, sec, s in sentences:
         wc = C.word_count(s)
@@ -183,10 +184,24 @@ def main():
             if m:
                 add("WARN", "common-error", src, "possible %s '%s': %s..." % (kind, m.group(0), s[:70]))
 
+    # the same experimental unit counted two ways (for example 3 seeds and 5 seeds)
+    words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+    seen = {}
+    for src, sec, s in sentences:
+        for m in re.finditer(r"\b(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(?:random\s+|independent\s+|different\s+|separate\s+)?(seeds?|folds?|trials?|repetitions?)\b", s, re.I):
+            v = words.get(m.group(1).lower())
+            v = v if v is not None else int(m.group(1))
+            kind = m.group(2).lower().rstrip("s")
+            seen.setdefault(kind, {}).setdefault(v, []).append(src)
+    for kind, vals in seen.items():
+        if len(vals) > 1:
+            where = "; ".join("%d at line %s" % (v, ",".join(map(str, ls[:3]))) for v, ls in sorted(vals.items()))
+            add("WARN", "count-mismatch", min(min(ls) for ls in vals.values()), "the paper gives different numbers of %ss: %s" % (kind, where))
+
     # acronyms
     def_ac = set(re.findall(r"\(\s*([A-Z][A-Za-z]{1,7}s?)\s*\)", full_text))
     def_ac |= set(re.findall(r"\\newacronym\{[^}]*\}\{([^}]*)\}", raw))
-    counts = collections.Counter(re.findall(r"\b[A-Z]{2,7}s?\b", re.sub(r"\[cite:[^\]]*\]|\(ref:[^)]*\)", " ", full_text)))
+    counts = collections.Counter(re.findall(r"\b[A-Z]{2,7}s?\b", re.sub(r"\[cite:[^\]]*\]|\(ref:[^)]*\)", " ", full_text_nomath)))
     for ac, n in counts.items():
         base = ac.rstrip("s") if ac.endswith("s") and len(ac) > 3 else ac
         if n >= 2 and base not in ACR_OK and ac not in ACR_OK and base not in def_ac and ac not in def_ac:
