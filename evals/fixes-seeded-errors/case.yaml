@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: fixes-seeded-errors
+expected_outcome: |
+  The run finds the seeded defects (the TODO-EVIDENCE marker, the undefined figure and section references,
+  the citation key that is not in the bibliography, the abstract number absent from the body, the repeated
+  word, the unsupported "significantly", the em dash) and fixes the mechanical ones. It does not invent a
+  result for the placeholder or a reference for the missing citation; those stay marked and are reported
+  as needing the user. A report states how many issues were found and fixed.
+context:
+  scaffold_script: place-files.sh

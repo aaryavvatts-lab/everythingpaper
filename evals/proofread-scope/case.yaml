@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: proofread-scope
+expected_outcome: |
+  The run fixes the grammar and spelling errors (method are, then, beleive, Experiments is run) and leaves the
+  scientific claims unchanged. It flags, rather than silently rewrites, the unsupported "state-of-the-art" and
+  "significantly faster" claims and the "broad impact" claim, and offers to soften them. It adds no citations
+  or numbers.
